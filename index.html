@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>鎖住拋物線</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=Noto+Sans+TC:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* 版面概念：雙色孔版印刷（Risograph）海報。藍墨印「還可能的拋物線」，粉紅墨印「線索與答案」，兩色疊印處自然變紫。
+   一張報紙式三欄：左＝題目與線索、中＝可能性之雲、右＝自由度與作答。 */
+:root{
+  --paper:#F1ECE1; --sheet:#F7F3EA; --ink:#1B1A1F; --ink-2:#55514A; --ink-3:#9C968B; --hair:#CFC7B8;
+  --blue:#0078BF; --pink:#FF48B0; --yellow:#FFE24A;
+  --blend:multiply; --cloud-op:.2;
+  --f-cjk:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  --f-num:"Space Grotesk","Noto Sans TC",sans-serif;
+  --f-mono:"IBM Plex Mono","Noto Sans TC",ui-monospace,monospace;
+  --f-var:"Instrument Serif","Times New Roman",serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#141519; --sheet:#1B1C22; --ink:#EEE8DC; --ink-2:#B9B3A7; --ink-3:#7A756C; --hair:#34353D;
+  --blue:#3AA6F2; --pink:#FF5EBE; --yellow:#E8CF3A; --blend:screen; --cloud-op:.28; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#141519; --sheet:#1B1C22; --ink:#EEE8DC; --ink-2:#B9B3A7; --ink-3:#7A756C; --hair:#34353D;
+  --blue:#3AA6F2; --pink:#FF5EBE; --yellow:#E8CF3A; --blend:screen; --cloud-op:.28; color-scheme:dark}
+
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+html,body{height:100%;overflow:hidden}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-cjk);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+i.v{font-family:var(--f-var);font-style:italic;font-size:1.12em;letter-spacing:.01em}
+sup{font-size:.6em;line-height:0}
+sub{font-size:.62em;line-height:0}
+
+/* 紙紋 */
+.grain{position:fixed;inset:0;pointer-events:none;z-index:50;opacity:.33;mix-blend-mode:var(--blend);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .42 0 0 0 0 .38 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E")}
+:root[data-theme="dark"] .grain{opacity:.12}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .grain{opacity:.12}}
+
+/* 舞台：固定 1600×900，等比縮放 */
+#stage{position:absolute;left:50%;top:50%;width:1600px;height:900px;transform-origin:50% 50%;background:var(--paper);display:grid;grid-template-rows:108px 1fr}
+
+/* ===== 刊頭 ===== */
+.mast{display:grid;grid-template-columns:auto 1fr auto;align-items:end;gap:28px;padding:0 30px 14px;border-bottom:3px solid var(--ink);position:relative}
+.mast::after{content:"";position:absolute;left:0;right:0;bottom:-8px;border-bottom:1px solid var(--ink)}
+.kicker{font-family:var(--f-mono);font-size:12.5px;letter-spacing:.16em;color:var(--ink-2);margin-bottom:4px;text-transform:uppercase}
+.kicker b{color:var(--pink);font-weight:600}
+h1{font-weight:900;font-size:60px;line-height:1;letter-spacing:.04em;position:relative;isolation:isolate;white-space:nowrap}
+h1::before{content:attr(data-t);position:absolute;left:4px;top:3px;color:var(--pink);z-index:-1;mix-blend-mode:var(--blend)}
+.note{font-size:15px;line-height:1.6;color:var(--ink-2);max-width:470px;padding-left:16px;border-left:3px solid var(--pink);margin-bottom:4px}
+.note b{color:var(--ink)}
+.tabs{display:flex;align-items:flex-end;gap:2px}
+.tab{width:74px;padding:6px 0 7px;text-align:center;position:relative;border-top:1px solid transparent}
+.tab .n{display:block;font-family:var(--f-num);font-weight:700;font-size:30px;line-height:1;letter-spacing:-.02em}
+.tab .l{display:block;font-size:12.5px;margin-top:4px;color:var(--ink-2);font-weight:500}
+.tab:hover .n{color:var(--blue)}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+.tab[aria-selected="true"] .l{color:var(--paper)}
+.tab[aria-selected="true"] .n{color:var(--paper)}
+.tab .done{position:absolute;top:4px;right:6px;width:12px;height:12px;border-radius:50%;background:var(--pink)}
+.tab:focus-visible,.card:focus-visible,.btn:focus-visible,.chip:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.tools{position:absolute;top:12px;right:30px;display:flex;gap:14px;font-family:var(--f-mono);font-size:12px;letter-spacing:.08em}
+.tools button{color:var(--ink-2);border-bottom:1px solid var(--ink-3);padding-bottom:1px}
+.tools button:hover{color:var(--ink)}
+
+/* ===== 主體三欄 ===== */
+.body{display:grid;grid-template-columns:410px 1fr 380px;min-height:0;margin-top:8px;position:relative}
+.col{min-height:0;position:relative}
+.col+.col{border-left:1.5px solid var(--ink)}
+.lab{font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);display:flex;justify-content:space-between;align-items:baseline}
+.lab b{color:var(--pink);font-weight:600}
+
+/* 左欄 */
+.left{padding:20px 26px 22px;display:flex;flex-direction:column;gap:14px}
+.q{padding-bottom:14px;border-bottom:1px solid var(--ink)}
+.q h2{font-size:25px;font-weight:700;line-height:1.42;margin-top:8px;letter-spacing:.01em;text-wrap:pretty}
+.steps{display:flex;gap:0;margin-top:12px;font-size:13.5px;font-weight:500}
+.steps span{flex:1;padding:5px 0 4px;border-top:3px solid var(--hair);color:var(--ink-3)}
+.steps span.on{border-color:var(--pink);color:var(--ink)}
+.steps span.ok{border-color:var(--ink);color:var(--ink-2)}
+.cards{display:flex;flex-direction:column;gap:9px}
+.card{display:grid;grid-template-columns:46px 1fr auto;align-items:center;gap:10px;text-align:left;width:100%;min-height:62px;padding:8px 12px 8px 10px;border:1.5px dashed var(--ink-3);position:relative;isolation:isolate;transition:border-color .15s,background .15s}
+.card:hover{border-color:var(--ink)}
+.card .ix{font-family:var(--f-num);font-weight:700;font-size:34px;line-height:1;color:transparent;-webkit-text-stroke:1.3px var(--ink);text-align:center}
+.card .tx{font-size:18.5px;font-weight:500;line-height:1.35}
+.card .tr{display:block;font-family:var(--f-var);font-size:18px;color:var(--blue);margin-top:2px;line-height:1.2}
+.card .tag{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.06em;padding:3px 6px;border:1.5px solid currentColor;transform:rotate(-6deg);color:var(--pink);font-weight:600;white-space:nowrap}
+.left.labmode .card{min-height:50px;padding:5px 12px 5px 10px}
+.left.labmode .card .ix{font-size:28px}
+.left.labmode .card .tx{font-size:17px}
+.left.labmode{gap:11px}
+.card.picked{border:2px solid var(--pink)}
+.card.picked .ix{color:var(--pink);-webkit-text-stroke:0;mix-blend-mode:var(--blend)}
+.card.on{border:2px solid var(--blue)}
+.card.on::before{content:"";position:absolute;inset:0;z-index:-1;opacity:.22;background-image:radial-gradient(var(--blue) 1.15px,transparent 1.6px);background-size:6px 6px}
+.card.on .ix{color:var(--blue);-webkit-text-stroke:0}
+.card .x{font-family:var(--f-mono);font-size:18px;color:var(--ink-3);padding:0 4px}
+.card .x:hover{color:var(--pink)}
+.find{background:var(--pink);color:#fff;padding:9px 12px;font-size:15.5px;font-weight:700;line-height:1.45;mix-blend-mode:normal}
+:root[data-theme="dark"] .find{color:#1B1A1F}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .find{color:#1B1A1F}}
+.find small{display:block;font-family:var(--f-mono);font-weight:500;font-size:11px;letter-spacing:.14em;opacity:.85}
+.lefthint{font-size:14.5px;color:var(--ink-2);line-height:1.6}
+.spacer{flex:1}
+.btn{width:100%;height:54px;background:var(--ink);color:var(--paper);font-size:18px;font-weight:700;letter-spacing:.04em;display:flex;align-items:center;justify-content:center;gap:12px;position:relative}
+.btn::after{content:"";position:absolute;inset:0;transform:translate(5px,5px);background:var(--pink);z-index:-1;mix-blend-mode:var(--blend)}
+.btn{isolation:isolate}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--ink);height:44px;font-size:15.5px}
+.btn.ghost::after{display:none}
+.btn .arr{font-family:var(--f-num)}
+
+/* 中欄：雲 */
+.mid{padding:14px 24px 0}
+.mid svg{display:block;width:762px;height:740px;overflow:visible}
+.mid .cap{position:absolute;left:34px;top:22px;pointer-events:none}
+.mid .cap .big{font-family:var(--f-num);font-weight:700;font-size:15px;letter-spacing:.02em}
+.mid .cap .sm{font-family:var(--f-mono);font-size:11.5px;color:var(--ink-2);letter-spacing:.06em;margin-top:2px}
+.legend{position:absolute;left:24px;right:24px;bottom:10px;display:flex;gap:22px;font-size:13px;color:var(--ink-2);align-items:center}
+.legend i.sw{display:inline-block;width:26px;height:0;border-top:2px solid var(--blue);vertical-align:middle;margin-right:7px;opacity:.7}
+.legend i.sw.p{border-color:var(--pink);opacity:1}
+.legend i.sw.k{border-top:3px solid var(--ink);opacity:1}
+.cloud path{fill:none;stroke:var(--blue);stroke-width:1.5;opacity:var(--cloud-op);mix-blend-mode:var(--blend)}
+.cloud.few path{opacity:.75;stroke-width:2.4}
+.fade{animation:fade .35s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.solo{fill:none;stroke:var(--ink);stroke-width:3.2}
+.solo-p{fill:none;stroke:var(--pink);stroke-width:3.2;mix-blend-mode:var(--blend)}
+.ax{stroke:var(--ink);stroke-width:1.5}
+.tick{font-family:var(--f-mono);font-size:12px;fill:var(--ink-2)}
+.lat{fill:var(--ink-3)}
+.pk{fill:var(--pink);mix-blend-mode:var(--blend)}
+.pkl{stroke:var(--pink);mix-blend-mode:var(--blend)}
+.inkl{stroke:var(--ink)}
+.lbl{font-family:var(--f-cjk);font-size:14px;font-weight:700;fill:var(--ink)}
+.lblp{font-family:var(--f-cjk);font-size:14px;font-weight:700;fill:var(--pink)}
+.lblm{font-family:var(--f-mono);font-size:13px;fill:var(--ink)}
+.plot-hit{fill:transparent;cursor:crosshair}
+.badge rect{fill:var(--paper);stroke:var(--ink);stroke-width:1.5}
+
+/* 右欄 */
+.right{padding:18px 26px 20px;display:flex;flex-direction:column;gap:12px}
+.formula{font-family:var(--f-var);font-size:30px;line-height:1;white-space:nowrap}
+.formula i{font-style:italic}
+.dof{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--ink)}
+.dof .num{font-family:var(--f-num);font-weight:700;font-size:118px;line-height:.8;letter-spacing:-.04em;color:var(--blue);position:relative;isolation:isolate;min-width:72px;text-align:center}
+.dof .num::before{content:attr(data-t);position:absolute;left:5px;top:4px;color:var(--pink);z-index:-1;mix-blend-mode:var(--blend)}
+.dof .what{font-size:15px;line-height:1.55;color:var(--ink-2)}
+.dof .what b{display:block;color:var(--ink);font-size:17px;margin-bottom:2px}
+.bars{display:flex;flex-direction:column;gap:2px}
+.bar{display:grid;grid-template-columns:30px 1fr 86px;align-items:center;gap:10px;height:40px}
+.bar .nm{font-family:var(--f-var);font-style:italic;font-size:30px;line-height:1;text-align:center}
+.bar svg{width:100%;height:34px;overflow:visible}
+.bar .st{font-family:var(--f-mono);font-size:12.5px;text-align:right;color:var(--ink-3);letter-spacing:.02em}
+.bar .st.lock{color:var(--paper);background:var(--ink);padding:3px 6px;font-weight:600}
+.bar .dot{fill:var(--blue);opacity:.45;mix-blend-mode:var(--blend)}
+.bar .dot.lk{fill:var(--pink);opacity:1}
+.strip{border-top:1px solid var(--ink);padding-top:10px}
+.strip svg{width:100%;height:64px;display:block;margin-top:6px;overflow:visible}
+.strip .msg{font-size:13.5px;color:var(--ink-3);margin-top:2px}
+.ans{border-top:1px solid var(--ink);padding-top:10px}
+.ans .row{display:flex;gap:8px;margin-top:8px;align-items:stretch}
+.ans .pre{font-family:var(--f-var);font-style:italic;font-size:28px;display:flex;align-items:center;padding-right:2px}
+.ans input{flex:1;min-width:0;height:48px;border:0;border-bottom:2px solid var(--ink);background:transparent;font-family:var(--f-num);font-size:28px;font-weight:700;color:var(--ink);padding:0 6px;outline:none}
+.ans input:focus{border-color:var(--pink)}
+.ans .send{width:84px;height:48px;font-size:16px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.chip{padding:9px 14px;border:1.5px solid var(--ink);font-size:17px;font-weight:500;min-height:44px}
+.chip:hover{background:var(--sheet)}
+.chip.sel{background:var(--ink);color:var(--paper)}
+.ans[aria-disabled="true"]{opacity:.38;pointer-events:none}
+.fb{font-size:15.5px;line-height:1.6;min-height:50px}
+.fb b{font-weight:700}
+.fb .k{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.14em;color:var(--pink);display:block;margin-bottom:2px}
+.take{background:var(--yellow);color:#1B1A1F;padding:12px 14px;font-size:17px;font-weight:700;line-height:1.5;position:relative;mix-blend-mode:normal}
+.take small{display:block;font-family:var(--f-mono);font-size:11px;letter-spacing:.16em;font-weight:500;margin-bottom:3px}
+.rec{font-family:var(--f-mono);font-size:12.5px;color:var(--ink-2);letter-spacing:.03em;display:flex;gap:10px;flex-wrap:wrap}
+.rec span{border:1px solid var(--ink-3);padding:2px 6px}
+.rec span.g{border-color:var(--pink);color:var(--pink)}
+
+/* 翻譯表 */
+.sum{position:absolute;top:0;right:0;bottom:0;left:410px;border-left:1.5px solid var(--ink);background:var(--paper);padding:22px 34px 20px;display:flex;flex-direction:column;gap:14px;z-index:5}
+.sum h3{font-size:34px;font-weight:900;letter-spacing:.03em;line-height:1.2}
+.sum h3 em{font-style:normal;color:var(--pink);mix-blend-mode:var(--blend)}
+.sum .lead{font-size:16px;color:var(--ink-2);line-height:1.6;max-width:900px}
+.tbl{display:grid;grid-template-columns:1.25fr 1.05fr .8fr .5fr;border-top:3px solid var(--ink);font-size:16px}
+.tbl>div{padding:9px 10px;white-space:pre-wrap;border-bottom:1px solid var(--hair);line-height:1.45;display:flex;align-items:center}
+.tbl .h{font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;color:var(--ink-2);border-bottom:1.5px solid var(--ink)}
+.tbl .tr2{font-family:var(--f-var);font-size:20px;word-spacing:.12em;white-space:pre-wrap}
+.tbl .cost{font-family:var(--f-num);font-weight:700;font-size:22px;color:var(--blue);justify-content:center}
+.need{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:3px solid var(--ink)}
+.need>div{padding:12px 14px 10px;border-right:1px solid var(--hair)}
+.need>div:last-child{border-right:0}
+.need .k{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.12em;color:var(--pink)}
+.need .t{font-size:17px;font-weight:700;margin:4px 0 6px;line-height:1.35}
+.need .d{font-size:14.5px;color:var(--ink-2);line-height:1.55}
+.need .locks{display:flex;gap:6px;margin-top:8px}
+.need .locks span{font-family:var(--f-var);font-style:italic;font-size:20px;width:30px;height:30px;display:grid;place-items:center;border:1.5px dashed var(--ink-3);color:var(--ink-3)}
+.need .locks span.y{border:1.5px solid var(--ink);background:var(--ink);color:var(--paper)}
+.need .locks span.s{border:1.5px solid var(--pink);color:var(--pink);font-style:normal;font-family:var(--f-num);font-size:15px;width:auto;padding:0 6px}
+.log{display:flex;flex-direction:column;gap:6px}
+.log .it{display:grid;grid-template-columns:40px 1fr;gap:8px;font-size:14.5px;line-height:1.45;padding:7px 0;border-bottom:1px solid var(--hair)}
+.log .it b{font-family:var(--f-num);font-size:20px}
+.log .it .mt{font-family:var(--f-mono);font-size:12px;color:var(--ink-2)}
+.log .it.d b{color:var(--pink)}
+</style>
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+<div id="stage">
+  <header class="mast">
+    <div>
+      <div class="kicker">九年級 · 二次函數 · <b>問題導向</b></div>
+      <h1 data-t="鎖住拋物線">鎖住拋物線</h1>
+    </div>
+    <p class="note">相似題不再直接給你相似；二次函數題也不再直接給你頂點式。題目給的是一句句<b>線索</b>。下筆前先問：<b>這題要的答案，需要鎖住 <i class="v">h</i>、<i class="v">k</i>、<i class="v">a</i> 的哪幾把？</b></p>
+    <nav class="tabs" role="tablist" id="tabs"></nav>
+    <div class="tools"><button id="btnTheme" type="button">深色</button><button id="btnFull" type="button">全螢幕</button></div>
+  </header>
+
+  <main class="body">
+    <section class="col left" id="left"></section>
+    <section class="col mid" id="mid">
+      <svg id="plot" viewBox="0 0 762 740" aria-label="可能性之雲：坐標平面"></svg>
+      <div class="cap"><div class="big" id="capBig"></div><div class="sm" id="capSm"></div></div>
+      <div class="legend" id="legend"></div>
+    </section>
+    <section class="col right" id="right"></section>
+    <section class="sum" id="sum" hidden></section>
+  </main>
+</div>
+
+<script>
+/* ================= 數學核心：參數 u = [h, k, a]，y = a(x − h)² + k ================= */
+const XMIN=-8, XMAX=10, YMIN=-7.5, YMAX=10, U=42, OX=3, OY=2;
+const sx=x=>OX+(x-XMIN)*U, sy=y=>OY+(YMAX-y)*U;
+const fx=X=>XMIN+(X-OX)/U, fy=Y=>YMAX-(Y-OY)/U;
+const M='−';
+const fm=v=>{ if(Math.abs(v)<1e-9) v=0; let s=Math.abs(v-Math.round(v))<1e-6?String(Math.round(v)):(+v.toFixed(2)).toString(); return s.replace('-',M); };
+
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+function build(clues){
+  const eq=[]; let sign=0, bad=false;
+  const setSign=s=>{ if(sign&&sign!==s) bad=true; sign=s; };
+  for(const c of clues){
+    if(c.t==='pt'||c.t==='root'){ const X=c.x, Y=c.t==='root'?0:c.y;
+      eq.push(u=>[u[2]*(X-u[0])**2+u[1]-Y, [-2*u[2]*(X-u[0]),1,(X-u[0])**2]]); }
+    else if(c.t==='axis'){ eq.push(u=>[u[0]-c.c,[1,0,0]]); }
+    else if(c.t==='vertex'){ eq.push(u=>[u[0]-c.x,[1,0,0]]); eq.push(u=>[u[1]-c.y,[0,1,0]]); }
+    else if(c.t==='ext'){ eq.push(u=>[u[1]-c.m,[0,1,0]]); setSign(c.kind==='max'?-1:1); }
+    else if(c.t==='open'){ setSign(c.s); }
+    else if(c.t==='touch'){ eq.push(u=>[u[1],[0,1,0]]); }
+    else if(c.t==='shape'){ if(c.signed) eq.push(u=>[u[2]-c.m,[0,0,1]]); else eq.push(u=>[u[2]*u[2]-c.m*c.m,[0,0,2*u[2]]]); }
+  }
+  return {eq,sign,bad};
+}
+function solveSym(A,b){ // 小矩陣高斯消去
+  const n=b.length, m=A.map((r,i)=>[...r,b[i]]);
+  for(let c=0;c<n;c++){ let p=c; for(let r=c+1;r<n;r++) if(Math.abs(m[r][c])>Math.abs(m[p][c])) p=r;
+    [m[c],m[p]]=[m[p],m[c]]; const d=m[c][c]; if(Math.abs(d)<1e-14) continue;
+    for(let r=0;r<n;r++){ if(r===c) continue; const f=m[r][c]/d; for(let k=c;k<=n;k++) m[r][k]-=f*m[c][k]; } }
+  return m.map((r,i)=>Math.abs(r[i])<1e-14?0:r[n]/r[i]);
+}
+function rankOf(J){
+  const m=J.map(r=>r.slice()); let rk=0; const used=[false,false,false];
+  for(let c=0;c<3;c++){ let p=-1,best=1e-7; for(let r=0;r<m.length;r++){ if(used[r]) continue; if(Math.abs(m[r][c])>best){best=Math.abs(m[r][c]);p=r;} }
+    if(p<0) continue; used[p]=true; rk++; for(let r=0;r<m.length;r++){ if(r===p) continue; const f=m[r][c]/m[p][c]; for(let k=0;k<3;k++) m[r][k]-=f*m[p][k]; } }
+  return rk;
+}
+function sampleCloud(clues,N=120,seed=20261029){
+  const {eq,sign,bad}=build(clues);
+  const res={pts:[],dof:3,bad:false,distinct:Infinity};
+  if(bad){res.bad=true;res.dof=0;return res;}
+  const rnd=mulberry(seed);
+  let tries=0;
+  while(res.pts.length<N && tries<N*6){
+    tries++;
+    const s=sign||(rnd()<.5?-1:1);
+    let u=[-6+rnd()*14, -6+rnd()*15, s*Math.exp(Math.log(.15)+rnd()*Math.log(2.6/.15))];
+    const w=[0,1,2].map(()=>Math.exp(-6+rnd()*12)); // 隨機度量：讓投影沿不同方向走，取樣才會鋪滿整個解集合
+    let ok=eq.length===0;
+    for(let it=0;it<60&&eq.length;it++){
+      const R=eq.map(f=>f(u)); const F=R.map(r=>r[0]), J=R.map(r=>r[1]);
+      const nrm=Math.hypot(...F); if(nrm<1e-10){ok=true;break;}
+      const A=J.map(r=>J.map(q=>w[0]*r[0]*q[0]+w[1]*r[1]*q[1]+w[2]*r[2]*q[2])); A.forEach((r,i)=>r[i]+=1e-10);
+      const y=solveSym(A,F); let st=[0,1,2].map(k=>w[k]*J.reduce((s,r,i)=>s+r[k]*y[i],0));
+      const sn=Math.hypot(...st); if(sn>4) st=st.map(v=>v*4/sn);
+      u=u.map((v,k)=>v-st[k]);
+      if(it===59){ ok=Math.hypot(...eq.map(f=>f(u)[0]))<1e-7; }
+    }
+    if(!ok) continue;
+    if(!isFinite(u[0]+u[1]+u[2])) continue;
+    if(Math.abs(u[2])<.06||Math.abs(u[2])>6||Math.abs(u[0])>30||Math.abs(u[1])>80) continue;
+    if(sign&&Math.sign(u[2])!==sign) continue;
+    res.pts.push(u);
+  }
+  if(res.pts.length===0){res.bad=true;res.dof=0;return res;}
+  res.dof=3-(eq.length?rankOf(eq.map(f=>f(res.pts[0])[1])):0);
+  const keys=new Set(res.pts.map(u=>u.map(v=>Math.round(v*1000)).join(',')));
+  res.distinct=keys.size>8?Infinity:keys.size;
+  return res;
+}
+function spread(vals){ return Math.max(...vals)-Math.min(...vals); }
+
+/* ================= 案例 ================= */
+const P=(x,y)=>({t:'pt',x,y}), R=x=>({t:'root',x});
+const CASES=[
+ {id:'lab', n:'00', l:'雲', lab:true,
+  q:'沒有題目，只有雲。',
+  sub:'點坐標平面上的格點，放一個「圖形通過」的點（最多 3 個；點已放的點可移除）。也可以打開下面的線索，看雲怎麼縮、自由度怎麼掉。',
+  clues:[{t:'open',s:1},{t:'open',s:-1},{t:'axis',c:1},{t:'touch'}],
+  tasks:['放 1 個點，自由度剩幾？雲變成什麼樣？','只放 2 個點，怎樣才能讓雲裡全部拋物線都用同一條對稱軸？','放到自由度 0，雲剩幾條？','同時打開「開口向上」「開口向下」會怎樣？']},
+ {id:'c1', n:'01', l:'等高',
+  q:'這條拋物線的對稱軸是 <i class="v">x</i> = ？',
+  clues:[P(-1,4),P(5,4),P(0,-1),{t:'open',s:1}],
+  query:{kind:'num',f:u=>u[0],pre:'x =',ans:2,mark:{t:'axis'},range:[-8,10]},
+  minSets:[[0,1]],
+  hint:'雲裡的對稱軸還東倒西歪。找找看：哪兩張線索一放在一起，就會逼所有拋物線用同一條對稱軸？',
+  take:'兩個一樣高的點，不必知道 a、k，就鎖住了對稱軸：h 是兩個 x 坐標的平均。'},
+ {id:'c2', n:'02', l:'鏡子',
+  q:'圖形與 <i class="v">x</i> 軸的<b>另一個</b>交點，<i class="v">x</i> 坐標是多少？',
+  clues:[R(-1),{t:'axis',c:2},{t:'ext',kind:'max',m:9},P(0,5)],
+  query:{kind:'num',f:u=>Math.abs(u[2]*(-1-u[0])**2+u[1])>1e-6?NaN:2*u[0]+1,pre:'x =',ans:5,mark:{t:'mirror',r:-1},range:[-8,12]},
+  minSets:[[0,1],[0,2,3],[1,2,3]],
+  hint:'另一個交點是 (−1, 0) 在「鏡子」另一邊的影子。先確定鏡子（對稱軸）在哪裡。',
+  take:'對稱軸是一面鏡子：已知一個交點和對稱軸，另一個交點直接照出來，a 和最大值都用不到。'},
+ {id:'c3', n:'03', l:'比高低',
+  q:'點 A(−2, <i class="v">y</i><sub>1</sub>)、B(5, <i class="v">y</i><sub>2</sub>) 都在圖形上。<i class="v">y</i><sub>1</sub> 和 <i class="v">y</i><sub>2</sub> 哪個大？',
+  clues:[{t:'axis',c:2},{t:'open',s:-1},P(0,3),P(6,-5)],
+  query:{kind:'cat',f:u=>{const d=u[2]*((-2-u[0])**2-(5-u[0])**2); return Math.abs(d)<1e-6?0:Math.sign(d);},
+    opts:[{v:1,l:'y₁ > y₂'},{v:-1,l:'y₁ < y₂'},{v:0,l:'y₁ = y₂'}],ans:-1,mark:{t:'compare',A:-2,B:5}},
+  minSets:[[0,1],[0,2,3]],
+  hint:'比 y 的大小，關鍵是「誰離對稱軸比較遠」，還有拋物線往哪邊開。',
+  take:'比大小不必算 y：先看誰離對稱軸遠，開口向下時越遠越低，開口向上時越遠越高。'},
+ {id:'c4', n:'04', l:'牆',
+  q:'圖形上有沒有可能出現 <i class="v">y</i> 坐標為 −5 的點？',
+  clues:[{t:'vertex',x:1,y:-3},{t:'open',s:1},P(3,5),{t:'shape',m:2}],
+  query:{kind:'cat',f:u=>(u[2]>0?u[1]<=-5:u[1]>=-5)?1:0,opts:[{v:1,l:'可能'},{v:0,l:'不可能'}],ans:0,mark:{t:'wall',v:-5}},
+  minSets:[[0,1],[0,2]],
+  hint:'頂點是一道牆。要知道 −5 在牆的哪一邊，還得知道拋物線往牆的哪一邊長。',
+  take:'y 的範圍只看兩件事：頂點的 k（牆），和開口方向（往牆的哪一邊長）。'},
+ {id:'c5', n:'05', l:'陷阱',
+  q:'圖形與 <i class="v">y</i> 軸交點的 <i class="v">y</i> 坐標是多少？',
+  clues:[{t:'touch'},P(2,8),P(-2,8),{t:'shape',m:2,signed:true,text:'與 y = 2x² 的形狀、開口都相同'}],
+  query:{kind:'num',f:u=>u[2]*u[0]**2+u[1],pre:'y =',ans:0,mark:{t:'yint'},range:[-6,36]},
+  minSets:[[0,1,2],[1,2,3]],
+  hint:'鎖住 a 不一定有用。y 截距是 x = 0 時的 y：x = 0 和對稱軸有什麼關係？',
+  take:'兩個對稱於 y 軸的點先鎖住 h = 0，y 截距就等於 k；再多一把鎖就夠了。少了對稱點，a 和 k 都鎖住也還有兩條。'},
+ {id:'c6', n:'06', l:'全鎖',
+  q:'這個二次函數 <i class="v">y</i> = <i class="v">a</i>(<i class="v">x</i> − <i class="v">h</i>)² + <i class="v">k</i> 中，<i class="v">a</i> 是多少？',
+  clues:[R(1),R(5),{t:'ext',kind:'max',m:8},{t:'open',s:-1}],
+  query:{kind:'num',f:u=>u[2],pre:'a =',ans:-2,mark:{t:'a'},range:[-4,4]},
+  minSets:[[0,1,2]],
+  hint:'求 a 最貴：h、k 都要先鎖住，再用一個點把 a 算出來。',
+  take:'問 a 的題目三把鎖都要：兩個交點鎖 h，最大值鎖 k，再拿一個點回代求 a。「開口向下」在這裡是多餘的。'},
+ {id:'sum', n:'∑', l:'翻譯表', sum:true}
+];
+const CIRC=['①','②','③','④','⑤','⑥','⑦'];
+
+function clueText(c){
+  if(c.text) return c.text.replace(/x²/,'<i class="v">x</i>²').replace(/y =/,'<i class="v">y</i> =');
+  const pt=(x,y)=>`(${fm(x)}, ${fm(y)})`;
+  switch(c.t){
+    case 'pt': return `圖形通過 ${pt(c.x,c.y)}`;
+    case 'root': return `與 <i class="v">x</i> 軸交於 ${pt(c.x,0)}`;
+    case 'axis': return `對稱軸為 <i class="v">x</i> = ${fm(c.c)}`;
+    case 'vertex': return `頂點為 ${pt(c.x,c.y)}`;
+    case 'ext': return `${c.kind==='max'?'最大值':'最小值'}為 ${fm(c.m)}`;
+    case 'open': return c.s>0?'開口向上':'開口向下';
+    case 'touch': return '頂點在 <i class="v">x</i> 軸上';
+    case 'shape': return `與 <i class="v">y</i> = ${fm(c.m)}<i class="v">x</i>² 的圖形形狀相同`;
+  }
+}
+const V=s=>`<i>${s}</i>`;
+function clueTr(c){
+  const sq=x=>`(${fm(x)} − ${V('h')})²`;
+  switch(c.t){
+    case 'pt': return `${V('a')}${sq(c.x)} + ${V('k')} = ${fm(c.y)}`;
+    case 'root': return `${V('a')}${sq(c.x)} + ${V('k')} = 0`;
+    case 'axis': return `${V('h')} = ${fm(c.c)}`;
+    case 'vertex': return `${V('h')} = ${fm(c.x)}，${V('k')} = ${fm(c.y)}`;
+    case 'ext': return `${V('k')} = ${fm(c.m)}，${V('a')} ${c.kind==='max'?'<':'>'} 0`;
+    case 'open': return `${V('a')} ${c.s>0?'>':'<'} 0　（不花自由度）`;
+    case 'touch': return `${V('k')} = 0`;
+    case 'shape': return c.signed?`${V('a')} = ${fm(c.m)}`:`|${V('a')}| = ${fm(Math.abs(c.m))}　（正負未定）`;
+  }
+}
+
+/* ================= 狀態 ================= */
+let cur=0;
+const ST={};
+CASES.forEach(c=>ST[c.id]={phase:c.lab?'test':'pick',picked:new Set(),solved:false,bet:null,choice:null,input:'',fb:null,labPts:[]});
+try{ const s=JSON.parse(localStorage.getItem('lockParabola')||'{}'); for(const k in s){ if(ST[k]){ST[k].solved=!!s[k].solved;ST[k].bet=s[k].bet||null;} } }catch(e){}
+function save(){ try{ const o={}; for(const k in ST) o[k]={solved:ST[k].solved,bet:ST[k].bet}; localStorage.setItem('lockParabola',JSON.stringify(o)); }catch(e){} }
+
+function activeClues(C,S){
+  if(C.lab) return [...[...S.picked].map(i=>C.clues[i]), ...S.labPts.map(p=>P(p[0],p[1]))];
+  if(S.phase==='pick') return [];
+  return [...S.picked].sort().map(i=>C.clues[i]);
+}
+function evalQuery(C,cloud){
+  if(!C.query||cloud.bad||!cloud.pts.length) return {vals:[],conv:false};
+  const vals=cloud.pts.map(C.query.f);
+  const conv=C.query.kind==='num'?(vals.every(v=>isFinite(v))&&spread(vals)<2e-3):vals.every(v=>v===vals[0]);
+  return {vals,conv,val:vals[0]};
+}
+function convergedFor(C,idxs){ const cl=sampleCloud(idxs.map(i=>C.clues[i]),120,7); return evalQuery(C,cl).conv; }
+
+/* ================= 版面：分頁 ================= */
+const $=id=>document.getElementById(id);
+function renderTabs(){
+  $('tabs').innerHTML=CASES.map((c,i)=>`<button class="tab" role="tab" aria-selected="${i===cur}" data-i="${i}" type="button"><span class="n">${c.n}</span><span class="l">${c.l}</span>${ST[c.id].solved?'<span class="done" aria-label="已完成"></span>':''}</button>`).join('');
+  $('tabs').querySelectorAll('.tab').forEach(b=>b.onclick=()=>{cur=+b.dataset.i;render();});
+}
+
+/* ================= 主繪製 ================= */
+let cloud=null, qres=null;
+function render(){
+  renderTabs();
+  const C=CASES[cur];
+  $('sum').hidden=!C.sum;
+  if(C.sum){ renderSum(); renderLeftSum(); return; }
+  const S=ST[C.id];
+  const act=activeClues(C,S);
+  cloud=sampleCloud(act);
+  qres=evalQuery(C,cloud);
+  renderLeft(C,S);
+  renderPlot(C,S,act);
+  renderRight(C,S);
+}
+
+function equalPairs(C,S){
+  // 找出「一樣高」的兩點（含 x 軸交點）
+  const list=[];
+  if(C.lab){ S.labPts.forEach((p,i)=>list.push({x:p[0],y:p[1],name:`(${fm(p[0])}, ${fm(p[1])})`})); }
+  else if(S.phase==='test'){ [...S.picked].sort().forEach(i=>{const c=C.clues[i]; if(c.t==='pt'||c.t==='root') list.push({x:c.x,y:c.t==='root'?0:c.y,name:CIRC[i]});}); }
+  const out=[];
+  for(let i=0;i<list.length;i++)for(let j=i+1;j<list.length;j++) if(Math.abs(list[i].y-list[j].y)<1e-9&&list[i].x!==list[j].x) out.push([list[i],list[j]]);
+  return out;
+}
+
+function renderLeft(C,S){
+  const L=$('left'); L.classList.toggle('labmode',!!C.lab);
+  let h=`<div class="q"><div class="lab"><span>Q · ${C.lab?'實驗室':'題目要你回答'}</span><b>${C.n}</b></div><h2>${C.q}</h2>`;
+  if(C.lab) h+=`<p class="lefthint" style="margin-top:8px">${C.sub}</p>`;
+  else{
+    const st=S.phase==='pick'?0:(S.solved?2:1);
+    const lab=['① 選線索（下注）','② 看雲收不收','③ 作答'];
+    h+=`<div class="steps">${lab.map((t,i)=>`<span class="${i===st?'on':(i<st?'ok':'')}">${t}</span>`).join('')}</div>`;
+  }
+  h+=`</div>`;
+  const nPick=S.picked.size;
+  h+=`<div class="lab"><span>線索 · Clues</span><span>${C.lab?'點一下開／關':(S.phase==='pick'?`已選 ${nPick} / ${C.clues.length}`:`使用中 ${nPick} 張`)}</span></div><div class="cards">`;
+  const minMark=new Set(S.solved&&C.minSets?C.minSets.flat():[]);
+  C.clues.forEach((c,i)=>{
+    const on=S.picked.has(i);
+    const cls=on?(S.phase==='pick'?'picked':'on'):'';
+    const tr=(on&&S.phase==='test')?`<span class="tr">${clueTr(c)}</span>`:'';
+    const tag=(S.phase==='pick'&&on)?'<span class="tag">我選</span>':(minMark.has(i)?'<span class="tag">最少組合</span>':'<span></span>');
+    h+=`<button class="card ${cls}" data-i="${i}" type="button" aria-pressed="${on}"><span class="ix">${CIRC[i]}</span><span class="tx">${clueText(c)}${tr}</span>${tag}</button>`;
+  });
+  if(C.lab){
+    S.labPts.forEach((p,j)=>{
+      h+=`<div class="card on" style="cursor:default"><span class="ix">${CIRC[C.clues.length+j]}</span><span class="tx">圖形通過 (${fm(p[0])}, ${fm(p[1])})<span class="tr">${clueTr(P(p[0],p[1]))}</span></span><button class="x" data-r="${j}" type="button" aria-label="移除這個點">✕</button></div>`;
+    });
+    if(S.labPts.length===0) h+=`<p class="lefthint">→ 在坐標平面上點一個格點，就多一張「圖形通過」線索。</p>`;
+  }
+  h+=`</div>`;
+  const eqp=equalPairs(C,S);
+  if(eqp.length){ const [a,b]=eqp[0]; h+=`<div class="find"><small>發現 · FOUND</small>${a.name} 和 ${b.name} 一樣高（<i class="v">y</i> = ${fm(a.y)}）→ 對稱軸 <i class="v">x</i> = (${fm(a.x)} + ${fm(b.x)}) ÷ 2 = ${fm((a.x+b.x)/2)}</div>`; }
+  h+=`<div class="spacer"></div>`;
+  if(!C.lab){
+    if(S.phase==='pick'){
+      h+=`<p class="lefthint">先別看圖。讀題目要什麼，選出你認為<b>剛好夠用</b>的線索，越少越好。</p>`;
+      h+=`<button class="btn" id="apply" type="button" ${nPick?'':'disabled'}>套用這 ${nPick} 張　<span class="arr">→</span>　看雲</button>`;
+    } else {
+      h+=`<button class="btn ghost" id="rebet" type="button">重新下注</button>`;
+    }
+  }
+  L.innerHTML=h;
+  L.querySelectorAll('.card[data-i]').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.i; S.picked.has(i)?S.picked.delete(i):S.picked.add(i); S.fb=null; render();
+  });
+  L.querySelectorAll('.x[data-r]').forEach(b=>b.onclick=e=>{e.stopPropagation(); S.labPts.splice(+b.dataset.r,1); render();});
+  const ap=$('apply'); if(ap) ap.onclick=()=>{
+    S.phase='test';
+    const idx=[...S.picked].sort();
+    const conv=convergedFor(C,idx);
+    const minN=Math.min(...C.minSets.map(s=>s.length));
+    if(!S.bet) S.bet={n:idx.length,conv,min:minN};
+    S.fb={k:'下注結果',t:conv?(idx.length===minN?`<b>鎖住了，而且用了最少的 ${minN} 張。</b>現在去右邊作答。`:`<b>鎖住了。</b>不過有沒有哪一張拿掉之後，答案仍然鎖得住？試著點掉一張看看。`):`<b>雲還沒收攏</b>——雲裡的拋物線對答案還有不同意見。左邊的線索可以直接再點開或關掉。`};
+    save(); render();
+  };
+  const rb=$('rebet'); if(rb) rb.onclick=()=>{S.phase='pick';S.picked.clear();S.fb=null;S.choice=null;S.input='';render();};
+}
+
+/* ---------- 坐標平面 ---------- */
+function curvePath(u){
+  let d='', pen=false;
+  for(let x=XMIN;x<=XMAX+1e-9;x+=.15){
+    const y=u[2]*(x-u[0])**2+u[1];
+    const yy=Math.max(YMIN-6,Math.min(YMAX+6,y));
+    d+=(pen?'L':'M')+sx(x).toFixed(1)+' '+sy(yy).toFixed(1); pen=true;
+  }
+  return d;
+}
+function renderPlot(C,S,act){
+  const svg=$('plot'); let g='';
+  g+=`<defs><clipPath id="clip"><rect x="${sx(XMIN)}" y="${sy(YMAX)}" width="${(XMAX-XMIN)*U}" height="${(YMAX-YMIN)*U}"/></clipPath>
+      <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 1L10 5L0 9z" fill="var(--ink)"/></marker></defs>`;
+  // 格點十字
+  let lat='';
+  for(let x=Math.ceil(XMIN);x<=XMAX;x++)for(let y=Math.ceil(YMIN);y<=YMAX;y++){ if(x===0||y===0) continue; lat+=`M${sx(x)-2.5} ${sy(y)}h5M${sx(x)} ${sy(y)-2.5}v5`; }
+  g+=`<path d="${lat}" stroke="var(--ink-3)" stroke-width="1" opacity=".55"/>`;
+  // 軸
+  g+=`<line class="ax" x1="${sx(XMIN)}" y1="${sy(0)}" x2="${sx(XMAX)+8}" y2="${sy(0)}" marker-end="url(#ar)"/>`;
+  g+=`<line class="ax" x1="${sx(0)}" y1="${sy(YMIN)}" x2="${sx(0)}" y2="${sy(YMAX)-8}" marker-end="url(#ar)"/>`;
+  g+=`<text class="tick" x="${sx(XMAX)+4}" y="${sy(0)+20}" style="font-family:var(--f-var);font-style:italic;font-size:20px">x</text><text class="tick" x="${sx(0)+10}" y="${sy(YMAX)+8}" style="font-family:var(--f-var);font-style:italic;font-size:20px">y</text>`;
+  for(let x=-8;x<=10;x+=2){ if(!x) continue; g+=`<line x1="${sx(x)}" y1="${sy(0)-4}" x2="${sx(x)}" y2="${sy(0)+4}" class="ax"/><text class="tick" x="${sx(x)}" y="${sy(0)+19}" text-anchor="middle">${fm(x)}</text>`; }
+  for(let y=-6;y<=10;y+=2){ if(!y) continue; g+=`<line x1="${sx(0)-4}" y1="${sy(y)}" x2="${sx(0)+4}" y2="${sy(y)}" class="ax"/><text class="tick" x="${sx(0)-8}" y="${sy(y)+4}" text-anchor="end">${fm(y)}</text>`; }
+  g+=`<text class="tick" x="${sx(0)-8}" y="${sy(0)+19}" text-anchor="end">0</text>`;
+
+  const showQ=!C.lab&&S.phase==='test';
+  // 線索圖形（底層）
+  g+=`<g clip-path="url(#clip)">`;
+  act.forEach(c=>{
+    if(c.t==='axis') g+=`<line x1="${sx(c.c)}" y1="${sy(YMAX)}" x2="${sx(c.c)}" y2="${sy(YMIN)}" class="pkl" stroke-width="2.5" stroke-dasharray="8 6"/>`;
+    if(c.t==='ext') g+=`<line x1="${sx(XMIN)}" y1="${sy(c.m)}" x2="${sx(XMAX)}" y2="${sy(c.m)}" class="pkl" stroke-width="2.5" stroke-dasharray="8 6"/>`;
+    if(c.t==='touch') g+=`<line x1="${sx(XMIN)}" y1="${sy(0)}" x2="${sx(XMAX)}" y2="${sy(0)}" class="pkl" stroke-width="9" opacity=".4"/>`;
+    if(c.t==='shape'){ const m=c.m; let d=''; for(let x=-3;x<=3;x+=.1){const y=m*x*x; if(y>YMAX+1) continue; d+=(d?'L':'M')+sx(x).toFixed(1)+' '+sy(y).toFixed(1);} g+=`<path d="${d}" fill="none" stroke="var(--ink-2)" stroke-width="1.6" stroke-dasharray="2 5" stroke-linecap="round"/>`; }
+  });
+  g+=`</g>`;
+  // 雲
+  const few=cloud.distinct<=4;
+  g+=`<g class="cloud fade ${few?'few':''}" clip-path="url(#clip)">`;
+  if(!cloud.bad){
+    if(cloud.distinct===1){ const u=cloud.pts[0]; g+=`<path class="solo-p" d="${curvePath(u)}" transform="translate(4 3)"/><path class="solo" d="${curvePath(u)}"/>`; }
+    else { const seen=new Set(); cloud.pts.forEach(u=>{ const k=u.map(v=>Math.round(v*1000)).join(); if(few&&seen.has(k)) return; seen.add(k); g+=`<path d="${curvePath(u)}"/>`; }); }
+  }
+  g+=`</g>`;
+  // 問題標記（每一條拋物線給的答案）
+  if(showQ&&!cloud.bad){
+    const mk=C.query.mark; g+=`<g clip-path="url(#clip)" class="fade">`;
+    const pts=cloud.pts.slice(0,90);
+    if(mk.t==='axis') pts.forEach(u=>g+=`<line x1="${sx(u[0])}" y1="${sy(YMAX)}" x2="${sx(u[0])}" y2="${sy(YMIN)}" class="pkl" stroke-width="1.4" opacity=".28"/>`);
+    if(mk.t==='mirror') pts.filter(u=>isFinite(C.query.f(u))).forEach(u=>g+=`<circle cx="${sx(2*u[0]-mk.r)}" cy="${sy(0)}" r="7" fill="none" class="pkl" stroke-width="2" opacity=".55"/>`);
+    if(mk.t==='yint'){ g+=`<line x1="${sx(0)}" y1="${sy(YMAX)}" x2="${sx(0)}" y2="${sy(YMIN)}" class="pkl" stroke-width="7" opacity=".3"/>`; pts.forEach(u=>g+=`<circle cx="${sx(0)}" cy="${sy(u[2]*u[0]**2+u[1])}" r="5.5" class="pk" opacity=".6"/>`); }
+    if(mk.t==='wall'){ pts.forEach(u=>g+=`<circle cx="${sx(u[0])}" cy="${sy(u[1])}" r="5.5" class="pk" opacity=".6"/>`); }
+    if(mk.t==='compare'){ [mk.A,mk.B].forEach((x,j)=>{ g+=`<line x1="${sx(x)}" y1="${sy(YMAX)}" x2="${sx(x)}" y2="${sy(YMIN)}" class="inkl" stroke-width="1.2" stroke-dasharray="3 5"/>`; pts.forEach(u=>g+=`<circle cx="${sx(x)}" cy="${sy(u[2]*(x-u[0])**2+u[1])}" r="5" ${j?'fill="var(--ink)" opacity=".5"':'class="pk" opacity=".65"'}/>`); }); }
+    if(mk.t==='a') pts.forEach(u=>g+=`<path d="M${sx(u[0])} ${sy(u[1])}H${sx(u[0]+1)}V${sy(u[1]+u[2])}" fill="none" class="pkl" stroke-width="2.4" opacity=".6"/><circle cx="${sx(u[0])}" cy="${sy(u[1])}" r="4" class="pk"/>`);
+    g+=`</g>`;
+    if(mk.t==='wall') g+=`<line x1="${sx(XMIN)}" y1="${sy(mk.v)}" x2="${sx(XMAX)}" y2="${sy(mk.v)}" class="inkl" stroke-width="2" stroke-dasharray="10 6"/><text class="lbl" x="${sx(XMAX)-6}" y="${sy(mk.v)-8}" text-anchor="end">y = −5 ?</text>`;
+    if(mk.t==='compare') g+=`<text class="lblp" x="${sx(mk.A)+6}" y="${sy(YMAX)+18}">A　x = −2</text><text class="lbl" x="${sx(mk.B)+6}" y="${sy(YMAX)+18}">B　x = 5</text>`;
+    if(mk.t==='a'&&cloud.distinct===1){ const u=cloud.pts[0]; g+=`<text class="lblp" x="${sx(u[0]+1)+8}" y="${sy(u[1]+u[2]/2)+5}">往右 1，${u[2]<0?'下降':'上升'} ${fm(Math.abs(u[2]))}</text>`; }
+  }
+  // 線索文字標籤與點（最上層）
+  act.forEach(c=>{
+    if(c.t==='pt'||c.t==='root'){ const y=c.t==='root'?0:c.y; g+=`<circle cx="${sx(c.x)}" cy="${sy(y)}" r="8" fill="var(--paper)" class="pkl" stroke-width="3.5"/><text class="lblm" x="${sx(c.x)+12}" y="${sy(y)-10}">(${fm(c.x)}, ${fm(y)})</text>`; }
+    if(c.t==='vertex') g+=`<rect x="${sx(c.x)-8}" y="${sy(c.y)-8}" width="16" height="16" transform="rotate(45 ${sx(c.x)} ${sy(c.y)})" class="pk"/><text class="lblp" x="${sx(c.x)+14}" y="${sy(c.y)+22}">頂點 (${fm(c.x)}, ${fm(c.y)})</text>`;
+    if(c.t==='axis') g+=`<text class="lblp" x="${sx(c.c)+8}" y="${sy(YMIN)-10}">x = ${fm(c.c)}</text>`;
+    if(c.t==='ext') g+=`<text class="lblp" x="${sx(XMIN)+8}" y="${sy(c.m)-8}">${c.kind==='max'?'最大值':'最小值'} ${fm(c.m)}　（${c.kind==='max'?'天花板':'地板'}）</text>`;
+    if(c.t==='shape') g+=`<text class="tick" x="${sx(1.6)+6}" y="${sy(Math.min(YMAX-.5,c.m*2.6))}">${c.signed?'':'形狀樣板 '}y = ${fm(c.m)}x²</text>`;
+  });
+  // 等高連線
+  const eqp=equalPairs(C,S);
+  eqp.slice(0,1).forEach(([a,b])=>{ const m=(a.x+b.x)/2; g+=`<line x1="${sx(a.x)}" y1="${sy(a.y)}" x2="${sx(b.x)}" y2="${sy(b.y)}" class="inkl" stroke-width="1.6" stroke-dasharray="4 4"/><line x1="${sx(m)}" y1="${sy(a.y)-12}" x2="${sx(m)}" y2="${sy(a.y)+12}" class="inkl" stroke-width="2.5"/><text class="lbl" x="${sx(m)}" y="${sy(a.y)+30}" text-anchor="middle">中點 ${fm(m)}</text>`; });
+  // 開口徽章
+  const sg=build(act).sign;
+  if(sg){ g+=`<g class="badge" transform="translate(${sx(XMAX)-112} ${sy(YMAX)+8})"><rect width="104" height="34"/><text x="52" y="23" text-anchor="middle" class="lbl">開口${sg>0?'向上 ∪':'向下 ∩'}</text></g>`; }
+  if(cloud.bad) g+=`<g transform="translate(${sx(1)} ${sy(1.2)})"><rect x="-210" y="-34" width="420" height="68" fill="var(--paper)" stroke="var(--pink)" stroke-width="3"/><text text-anchor="middle" y="-4" class="lblp" style="font-size:20px">雲是空的</text><text text-anchor="middle" y="20" class="lbl" style="font-weight:500">這幾張線索互相矛盾，沒有拋物線能同時符合。</text></g>`;
+  // 實驗室：點擊層
+  if(C.lab) g+=`<rect class="plot-hit" id="hit" x="${sx(XMIN)}" y="${sy(YMAX)}" width="${(XMAX-XMIN)*U}" height="${(YMAX-YMIN)*U}"/>`;
+  svg.innerHTML=g;
+  if(C.lab){ $('hit').onclick=e=>{
+      if(S.labPts.length>=3) return;
+      const p=svg.createSVGPoint(); p.x=e.clientX; p.y=e.clientY; const q=p.matrixTransform(svg.getScreenCTM().inverse());
+      const x=Math.round(fx(q.x)), y=Math.round(fy(q.y));
+      if(S.labPts.some(t=>t[0]===x)) return; // 同一個 x 不能有兩個 y
+      S.labPts.push([x,y]); render(); }; }
+  // 說明
+  const n=cloud.bad?0:(cloud.distinct===Infinity?cloud.pts.length:cloud.distinct);
+  $('capBig').textContent=cloud.bad?'可能的拋物線：0 條':(cloud.distinct===Infinity?'可能的拋物線：無限多條':`可能的拋物線：只剩 ${n} 條`);
+  $('capSm').textContent=(!C.lab&&S.phase==='pick')?'還沒套用線索：這是「什麼都可能」的雲':(cloud.distinct===Infinity?`圖上畫出其中 ${n} 條取樣`:'');
+  let lg=`<span><i class="sw"></i>還可能的拋物線</span><span><i class="sw p"></i>線索</span>`;
+  if(showQ) lg+=`<span><i class="sw p" style="border-top-style:dotted;border-top-width:5px"></i>每一條拋物線給出的答案</span>`;
+  if(cloud.distinct===1) lg+=`<span><i class="sw k"></i>被鎖死的那一條</span>`;
+  $('legend').innerHTML=lg;
+}
+
+/* ---------- 右欄 ---------- */
+function barSvg(vals,lo,hi,locked){
+  const W=230, x=v=>8+(Math.max(lo,Math.min(hi,v))-lo)/(hi-lo)*(W-16);
+  let s=`<svg viewBox="0 0 ${W} 34" preserveAspectRatio="none"><line x1="8" y1="17" x2="${W-8}" y2="17" stroke="var(--ink)" stroke-width="1"/>`;
+  for(let t=Math.ceil(lo);t<=hi;t++) s+=`<line x1="${x(t)}" y1="${t===0?9:13}" x2="${x(t)}" y2="${t===0?25:21}" stroke="var(--ink-3)" stroke-width="${t===0?1.6:1}"/>`;
+  if(locked) s+=`<circle class="dot lk" cx="${x(vals[0])}" cy="17" r="7.5"/>`;
+  else { const r=mulberry(3); vals.forEach(v=>s+=`<circle class="dot" cx="${x(v)}" cy="${17+(r()-.5)*14}" r="3.2"/>`); }
+  return s+`</svg>`;
+}
+const DOFTXT={3:['h、k、a 都還能動','雲裡什麼形狀、什麼位置都有。'],2:['還有兩個方向能動','雲像一片布，可以往兩個方向拉。'],1:['只剩一個方向能動','雲像一根滑桿：拋物線排成一個家族。'],0:['整條拋物線被鎖死','只剩一條，再也動不了。']};
+function renderRight(C,S){
+  const Rt=$('right'); let h='';
+  const d=cloud.dof;
+  let big=String(d), title, desc;
+  if(cloud.bad){ big='×'; title='線索打架了'; desc='沒有任何拋物線同時符合這幾句話。'; }
+  else if(d===0&&cloud.distinct>1){ title=`自由度 0，卻還有 ${cloud.distinct} 條`; desc='方程式有好幾組解（常是正負號、或「兩邊都可以」沒定）。'; }
+  else { [title,desc]=DOFTXT[d]; }
+  h+=`<div class="formula"><i>y</i> = <i>a</i>(<i>x</i> − <i>h</i>)² + <i>k</i></div>`;
+  h+=`<div class="dof"><div class="num" data-t="${big}">${big}</div><div class="what"><span class="lab" style="margin-bottom:4px"><span>剩下的自由度</span></span><b>${title}</b>${desc}</div></div>`;
+  // 三把鎖
+  const P3=cloud.bad?[]:cloud.pts;
+  const rows=[['h',0,-8,10],['k',1,-8,10],['a',2,-4,4]];
+  h+=`<div class="bars"><div class="lab"><span>三把鎖 · 雲裡每條拋物線的值</span></div>`;
+  rows.forEach(([nm,i,lo,hi])=>{
+    const vals=P3.map(u=>u[i]); const lk=vals.length&&spread(vals)<2e-3;
+    let st='自由';
+    if(!vals.length) st='—';
+    else if(lk) st=`鎖住 ${fm(vals[0])}`;
+    else{ const ks=new Set(vals.map(v=>Math.round(v*1000))); if(ks.size<=4) st=`${ks.size} 種可能`; else if(vals.every(v=>v>0)) st='只知道 > 0'; else if(vals.every(v=>v<0)) st='只知道 < 0'; }
+    h+=`<div class="bar"><span class="nm">${nm}</span>${barSvg(vals,lo,hi,lk)}<span class="st ${lk?'lock':''}">${st}</span></div>`;
+  });
+  h+=`</div>`;
+
+  if(C.lab){
+    h+=`<div class="strip"><div class="lab"><span>試試看</span></div><ol style="margin:8px 0 0 20px;font-size:15.5px;line-height:1.75;color:var(--ink-2)">${C.tasks.map(t=>`<li>${t}</li>`).join('')}</ol></div>`;
+    h+=`<div class="spacer" style="flex:1"></div><div class="take"><small>觀念 · KEY IDEA</small>一句線索＝一道方程式＝花掉一個自由度。「開口向上／向下」不花自由度，只決定拋物線往哪邊長。</div>`;
+    Rt.innerHTML=h; return;
+  }
+  // 答案雲
+  const showQ=S.phase==='test';
+  h+=`<div class="strip"><div class="lab"><span>答案雲 · 每條拋物線給的答案</span>${showQ&&!cloud.bad?`<b>${qres.conv?'全體同意':'意見分歧'}</b>`:''}</div>`;
+  if(!showQ) h+=`<div class="msg" style="height:64px;display:flex;align-items:center">套用線索之後，這裡會顯示雲裡每一條拋物線各自給出的答案。</div>`;
+  else if(cloud.bad) h+=`<div class="msg" style="height:64px;display:flex;align-items:center">雲是空的，沒有答案。</div>`;
+  else h+=stripSvg(C,S);
+  h+=`</div>`;
+  // 作答
+  const q=C.query;
+  h+=`<div class="ans" aria-disabled="${!showQ}"><div class="lab"><span>作答</span>${S.solved?'<b>完成</b>':''}</div>`;
+  if(q.kind==='num') h+=`<div class="row"><span class="pre">${q.pre.replace(/([a-z])/,'$1')}</span><input id="inp" inputmode="decimal" autocomplete="off" value="${S.input}" aria-label="輸入答案" ${showQ?'':'tabindex="-1"'}><button class="btn send" id="send" type="button">送出</button></div>`;
+  else h+=`<div class="chips">${q.opts.map(o=>`<button class="chip ${S.choice===o.v?'sel':''}" data-v="${o.v}" type="button">${o.l.replace(/y([₁₂])/g,'<i class="v">y</i>$1')}</button>`).join('')}</div>`;
+  h+=`</div>`;
+  // 回饋
+  let fb=S.fb;
+  if(showQ&&!fb&&!S.solved){
+    if(cloud.bad) fb={k:'提示',t:'有兩張線索互相衝突，先關掉其中一張。'};
+    else if(!qres.conv) fb={k:'提示',t:C.hint};
+    else if(d>0) fb={k:'關鍵',t:`<b>雲裡還有 ${d} 個自由度，拋物線還有無限多條——但它們對答案的意見完全一致。</b>這就夠了，不必把整條拋物線求出來。`};
+    else fb={k:'關鍵',t:'<b>答案被鎖住了。</b>想想看：是不是每一張都非用不可？'};
+  }
+  h+=`<div class="fb">${fb?`<span class="k">${fb.k}</span>${fb.t}`:''}</div>`;
+  h+=`<div class="spacer" style="flex:1"></div>`;
+  if(S.solved){
+    const ms=C.minSets.map(s=>s.map(i=>CIRC[i]).join('')).join(' 或 ');
+    h+=`<div class="take"><small>帶走這一句 · TAKE AWAY</small>${C.take}</div>`;
+    h+=`<div class="rec">${S.bet?`<span>下注 ${S.bet.n} 張</span><span class="${S.bet.conv?'g':''}">${S.bet.conv?'一次鎖住':'第一次沒鎖住'}</span>`:''}<span class="g">最少組合 ${ms}</span></div>`;
+  }
+  Rt.innerHTML=h;
+  const send=()=>{
+    if(q.kind==='num'){ const raw=$('inp').value; S.input=raw; const v=parseNum(raw); if(v===null){S.fb={k:'提示',t:'請輸入一個數，例如 3、−2、1/2。'};render();return;} check(C,S,Math.abs(v-q.ans)<1e-6); }
+  };
+  if($('send')){ $('send').onclick=send; $('inp').onkeydown=e=>{if(e.key==='Enter')send();}; $('inp').oninput=e=>{S.input=e.target.value;}; }
+  Rt.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{ S.choice=+b.dataset.v; check(C,S,S.choice===q.ans); });
+}
+function parseNum(s){ s=String(s).replace(/[−–—]/g,'-').replace(/\s/g,''); if(!s) return null; const m=s.match(/^(-?\d+(?:\.\d+)?)(?:\/(\d+(?:\.\d+)?))?$/); if(!m) return null; return m[2]?(+m[1])/(+m[2]):+m[1]; }
+function check(C,S,ok){
+  if(ok&&qres.conv){ S.solved=true; S.fb={k:'答對了',t:'而且你的線索真的鎖住了它——不是猜中的。左邊標出了「最少組合」。'}; save(); }
+  else if(ok){ S.fb={k:'答案對，但……',t:'<b>你現在的線索還鎖不住這個答案</b>：雲裡還有拋物線給出別的答案，所以這一次算是猜中。補一張線索，讓雲全體同意，再送一次。'}; }
+  else if(qres.conv){ S.fb={k:'再看一次',t:'雲已經全體同意了，但不是這個答案。看看圖上粉紅色的標記落在哪裡。'}; }
+  else { S.fb={k:'再看一次',t:'這個答案不對；而且雲還沒收攏。先想想：這題的答案需要哪幾把鎖？'}; }
+  render();
+}
+function stripSvg(C,S){
+  const q=C.query, W=328;
+  let s=`<svg viewBox="0 0 ${W} 64">`;
+  if(q.kind==='num'){
+    const [lo,hi]=q.range, x=v=>10+(Math.max(lo,Math.min(hi,v))-lo)/(hi-lo)*(W-20);
+    s+=`<line x1="10" y1="40" x2="${W-10}" y2="40" stroke="var(--ink)" stroke-width="1.5"/>`;
+    const step=(hi-lo)>20?5:1;
+    for(let t=Math.ceil(lo/step)*step;t<=hi;t+=step){ s+=`<line x1="${x(t)}" y1="${t===0?32:35}" x2="${x(t)}" y2="${t===0?48:45}" stroke="var(--ink-2)" stroke-width="${t===0?1.8:1}"/>`; if((S.solved&&(step>1||t%2===0))||t===0) s+=`<text x="${x(t)}" y="62" text-anchor="middle" class="tick" style="font-size:11px">${fm(t)}</text>`; }
+    if(qres.conv){ s+=`<circle cx="${x(qres.val)}" cy="22" r="11" class="pk"/><line x1="${x(qres.val)}" y1="33" x2="${x(qres.val)}" y2="40" class="pkl" stroke-width="3"/>`; if(S.solved) s+=`<text x="${x(qres.val)+16}" y="27" class="lblp" style="font-family:var(--f-num);font-size:18px">${fm(qres.val)}</text>`; }
+    else { const r=mulberry(5); qres.vals.filter(isFinite).forEach(v=>s+=`<circle cx="${x(v)}" cy="${10+r()*22}" r="3.6" class="pk" opacity=".6"/>`); }
+  } else {
+    const n=q.opts.length, bw=(W-8*(n-1))/n;
+    q.opts.forEach((o,j)=>{ const cnt=qres.vals.filter(v=>v===o.v).length; const x0=j*(bw+8);
+      s+=`<rect x="${x0}" y="2" width="${bw}" height="44" fill="none" stroke="var(--ink)" stroke-width="1.2"/>`;
+      const w=(bw-8)*cnt/qres.vals.length; if(cnt) s+=`<rect x="${x0+4}" y="6" width="${w}" height="36" class="pk" opacity=".75"/>`;
+      s+=`<text x="${x0+bw/2}" y="61" text-anchor="middle" class="tick" style="font-size:12px">${S.solved?o.l:'？'}　${cnt?Math.round(100*cnt/qres.vals.length)+'%':''}</text>`; });
+  }
+  return s+`</svg>`;
+}
+
+/* ---------- 翻譯表 ---------- */
+function renderSum(){
+  const rows=[
+    ['圖形通過 (<i class="v">p</i>, <i class="v">q</i>)','<i>a</i>(<i>p</i> − <i>h</i>)² + <i>k</i> = <i>q</i>','三者的一個關係','1'],
+    ['通過兩個<b>一樣高</b>的點','<i>h</i> = 兩個 <i>x</i> 的平均','對稱軸 <i class="v">h</i>（再加一個關係）','2'],
+    ['對稱軸為 <i class="v">x</i>&nbsp;=&nbsp;<i class="v">c</i>；頂點在&nbsp;<i class="v">y</i>&nbsp;軸上','<i>h</i>&nbsp;=&nbsp;<i>c</i>；<i>h</i>&nbsp;=&nbsp;0','<i class="v">h</i>','1'],
+    ['頂點為 (<i class="v">p</i>, <i class="v">q</i>)','<i>h</i> = <i>p</i>，<i>k</i> = <i>q</i>','<i class="v">h</i>、<i class="v">k</i>','2'],
+    ['最大值／最小值為 <i class="v">m</i>','<i>k</i> = <i>m</i>，並知道 <i>a</i> 的正負','<i class="v">k</i>（附送開口）','1'],
+    ['頂點在 <i class="v">x</i> 軸上；與 <i class="v">x</i> 軸只有一個交點','<i>k</i> = 0','<i class="v">k</i>','1'],
+    ['與 <i class="v">y</i> = <i class="v">m</i><i class="v">x</i>² 形狀相同','|<i>a</i>| = |<i>m</i>|','<i class="v">a</i> 的大小（正負未定）','1'],
+    ['開口向上／向下','<i>a</i> > 0 或 <i>a</i> < 0','不鎖，但決定牆的哪一邊','0'],
+  ];
+  let h=`<h3>先問答案要<em>哪幾把鎖</em>，再去題目裡<em>找</em>線索。</h3>
+  <p class="lead">相似題考的是「找出哪兩個三角形相似」，二次函數題考的是「看出每句話鎖住了什麼」。下表把題目裡常見的話，翻譯成 <i class="v">h</i>、<i class="v">k</i>、<i class="v">a</i> 的鎖；最右欄是它花掉幾個自由度（共 3 個）。</p>
+  <div class="tbl"><div class="h">題目裡的話</div><div class="h">翻譯</div><div class="h">鎖住</div><div class="h" style="justify-content:center">花掉</div>
+  ${rows.map(r=>`<div>${r[0]}</div><div class="tr2">${r[1]}</div><div>${r[2]}</div><div class="cost">${r[3]}</div>`).join('')}</div>
+  <div class="need">
+    <div><div class="k">對稱軸／對稱點</div><div class="t">只要 <i class="v">h</i></div><div class="d">兩個等高點，或一個交點加對稱軸，就能照鏡子。</div><div class="locks"><span class="y">h</span><span>k</span><span>a</span></div></div>
+    <div><div class="k">兩點 y 值比大小</div><div class="t"><i class="v">h</i> ＋ 開口方向</div><div class="d">比的是誰離對稱軸遠，不必算出 y。</div><div class="locks"><span class="y">h</span><span>k</span><span>a</span><span class="s">±</span></div></div>
+    <div><div class="k">y 的範圍／最大最小值</div><div class="t"><i class="v">h</i>、<i class="v">k</i> ＋ 開口方向</div><div class="d">頂點是牆，開口決定往牆的哪一邊長。</div><div class="locks"><span class="y">h</span><span class="y">k</span><span>a</span><span class="s">±</span></div></div>
+    <div><div class="k">求 a、求某點的 y</div><div class="t">三把都要</div><div class="d">最貴的題型。先鎖 h、k，再用一個點回代。</div><div class="locks"><span class="y">h</span><span class="y">k</span><span class="y">a</span></div></div>
+  </div>`;
+  $('sum').innerHTML=h;
+}
+function renderLeftSum(){
+  let h=`<div class="q"><div class="lab"><span>你的下注紀錄</span><b>∑</b></div><h2>每一題，你用了幾張就鎖住？</h2></div><div class="log">`;
+  CASES.filter(c=>!c.lab&&!c.sum).forEach(c=>{ const S=ST[c.id]; const minN=Math.min(...c.minSets.map(s=>s.length));
+    h+=`<div class="it ${S.solved?'d':''}"><b>${c.n}</b><div>${c.l}　<span class="mt">${S.bet?`下注 ${S.bet.n} 張 · ${S.bet.conv?'一次鎖住':'沒鎖住'} · 最少 ${minN} 張`:'還沒做'}${S.solved?' · 完成':''}</span></div></div>`; });
+  h+=`</div><div class="spacer"></div><p class="lefthint">回到紙本題目時，第一筆不是算，而是在題目旁邊寫下：<b>答案要哪幾把鎖？題目哪一句給了它？</b></p><button class="btn ghost" id="reset" type="button">清除紀錄，重新開始</button>`;
+  $('left').innerHTML=h;
+  $('reset').onclick=()=>{ CASES.forEach(c=>ST[c.id]={phase:c.lab?'test':'pick',picked:new Set(),solved:false,bet:null,choice:null,input:'',fb:null,labPts:[]}); save(); render(); };
+}
+
+/* ---------- 縮放、主題、全螢幕 ---------- */
+function fit(){ const s=Math.min(innerWidth/1600,innerHeight/900); $('stage').style.transform=`translate(-50%,-50%) scale(${s})`; }
+addEventListener('resize',fit); fit();
+function isDark(){ const t=document.documentElement.dataset.theme; return t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches; }
+function syncThemeBtn(){ $('btnTheme').textContent=isDark()?'淺色':'深色'; }
+$('btnTheme').onclick=()=>{ document.documentElement.dataset.theme=isDark()?'light':'dark'; try{localStorage.setItem('lockParabolaTheme',document.documentElement.dataset.theme);}catch(e){} syncThemeBtn(); };
+try{ const t=localStorage.getItem('lockParabolaTheme'); if(t) document.documentElement.dataset.theme=t; }catch(e){}
+syncThemeBtn();
+$('btnFull').onclick=()=>{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen(); };
+document.addEventListener('fullscreenchange',()=>{$('btnFull').textContent=document.fullscreenElement?'離開全螢幕':'全螢幕';});
+addEventListener('keydown',e=>{ if(e.target.tagName==='INPUT') return; if(e.key==='ArrowRight'){cur=Math.min(CASES.length-1,cur+1);render();} if(e.key==='ArrowLeft'){cur=Math.max(0,cur-1);render();} });
+window.__T={CASES,sampleCloud,evalQuery,convergedFor};
+render();
+</script>
+</body>
+</html>
